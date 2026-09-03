@@ -15,19 +15,22 @@ variable "bucket_name" {
 provider "aws" {
   region = "us-west-2"
 
-  # Desativa verificações padrão do provedor AWS que requerem permissões restritas no AWS Academy
+  # Bypasses para evitar chamadas de leitura bloqueadas pelo IAM da AWS Academy
   skip_requesting_account_id  = true
   skip_metadata_api_check     = true
   skip_region_validation      = true
 
-  # Ignora a checagem de Object Lock e outras verificações de APIs bloqueadas pelo IAM do Learner Lab
+  # Instrução para não tentar consultar apis avançadas do S3
   s3_use_path_style           = false
 }
 
-# 1. Criação do Bucket S3 (desativando o calculo de partições)
+# 1. Bucket principal com override para ignorar o Object Lock
 resource "aws_s3_bucket" "static_site_bucket" {
   bucket        = "static-site-${var.bucket_name}"
   force_destroy = true
+
+  # Evita que o Terraform tente ler a configuracao de Object Lock
+  object_lock_enabled = false
 
   tags = {
     Name        = "Static Site Bucket"
@@ -35,7 +38,7 @@ resource "aws_s3_bucket" "static_site_bucket" {
   }
 }
 
-# 2. Configuração do Site Estático
+# 2. Configuração de Site Estático
 resource "aws_s3_bucket_website_configuration" "static_site_config" {
   bucket = aws_s3_bucket.static_site_bucket.id
 
@@ -48,7 +51,7 @@ resource "aws_s3_bucket_website_configuration" "static_site_config" {
   }
 }
 
-# 3. Liberação do Acesso Público
+# 3. Liberação de acesso público
 resource "aws_s3_bucket_public_access_block" "static_site_bucket" {
   bucket = aws_s3_bucket.static_site_bucket.id
 
@@ -58,7 +61,7 @@ resource "aws_s3_bucket_public_access_block" "static_site_bucket" {
   restrict_public_buckets = false
 }
 
-# 4. Saída do Endpoint do Site
+# 4. Saída do Endpoint do site
 output "website_endpoint" {
   value       = aws_s3_bucket_website_configuration.static_site_config.website_endpoint
   description = "URL do site estático criado no S3"
