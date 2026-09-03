@@ -20,17 +20,21 @@ provider "aws" {
   skip_metadata_api_check     = true
   skip_region_validation      = true
 
-  # Instrução para não tentar consultar apis avançadas do S3
+  # Previne que o provider tente validar o estilo do endpoint via API
   s3_use_path_style           = false
 }
 
-# 1. Bucket principal com override para ignorar o Object Lock
+# 1. Bucket S3 com o bloco lifecycle/ignore_changes para ignorar o Object Lock
 resource "aws_s3_bucket" "static_site_bucket" {
   bucket        = "static-site-${var.bucket_name}"
   force_destroy = true
 
-  # Evita que o Terraform tente ler a configuracao de Object Lock
-  object_lock_enabled = false
+  lifecycle {
+    ignore_changes = [
+      object_lock_configuration,
+      object_lock_enabled
+    ]
+  }
 
   tags = {
     Name        = "Static Site Bucket"
@@ -38,7 +42,7 @@ resource "aws_s3_bucket" "static_site_bucket" {
   }
 }
 
-# 2. Configuração de Site Estático
+# 2. Configuração do Site Estático
 resource "aws_s3_bucket_website_configuration" "static_site_config" {
   bucket = aws_s3_bucket.static_site_bucket.id
 
@@ -61,7 +65,7 @@ resource "aws_s3_bucket_public_access_block" "static_site_bucket" {
   restrict_public_buckets = false
 }
 
-# 4. Saída do Endpoint do site
+# 4. Saída da URL do site
 output "website_endpoint" {
   value       = aws_s3_bucket_website_configuration.static_site_config.website_endpoint
   description = "URL do site estático criado no S3"
