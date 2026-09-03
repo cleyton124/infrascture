@@ -8,11 +8,9 @@ jobs:
   provision-s3:
     runs-on: ubuntu-latest
     steps:
-      # 1. Clona os arquivos do repositório
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Configura as credenciais da AWS via Secrets
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -21,24 +19,22 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-west-2
 
-      # 3. Instala a CLI do Terraform na máquina do Runner
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      # 4. Extrai o nome do bucket a partir do título da Issue aberta
       - name: Extract Bucket Name from Issue
         id: get_bucket
         run: |
-          echo "BUCKET_NAME=${{ github.event.issue.title }}" >> $GITHUB_ENV
+          # Formata o nome para minusculas e sem caracteres especiais
+          CLEAN_NAME=$(echo "${{ github.event.issue.title }}" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9-')
+          echo "BUCKET_NAME=$CLEAN_NAME" >> $GITHUB_ENV
 
-      # 5. Executa o Terraform no diretório correto
       - name: Run Terraform
         run: |
           cd terraform/s3_bucket_static_pasta
           terraform init
           terraform apply -auto-approve -var="bucket_name=${{ env.BUCKET_NAME }}"
 
-      # 6. Adiciona um comentário na Issue informando a conclusão
       - name: Comment on Issue
         uses: actions/github-script@v6
         with:
@@ -48,5 +44,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: 'O Bucket do S3 foi criado com sucesso!'
+              body: 'O Bucket do S3 foi configurado via Terraform com sucesso!'
             })
