@@ -8,32 +8,29 @@ jobs:
   provision-s3:
     runs-on: ubuntu-latest
     steps:
-      # 1. Clona os arquivos do repositório
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      # 2. Configura as credenciais da AWS via Secrets
+      # Adicionada a leitura da AWS_SESSION_TOKEN obrigatoria no AWS Academy
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-west-2
 
-      # 3. Extrai o nome do bucket a partir do título da Issue aberta
       - name: Extract Bucket Name from Issue
         id: get_bucket
         run: |
           echo "BUCKET_NAME=${{ github.event.issue.title }}" >> $GITHUB_ENV
 
-      # 4. Executa o Terraform no diretório correto
       - name: Run Terraform
         run: |
           cd Terraform/s3_static_website_pasta
           terraform init
           terraform apply -auto-approve -var="bucket_name=${{ env.BUCKET_NAME }}"
 
-      # 5. Adiciona um comentário na Issue informando a conclusão
       - name: Comment on Issue
         uses: actions/github-script@v6
         with:
