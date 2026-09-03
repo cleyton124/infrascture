@@ -1,72 +1,59 @@
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
+name: Create S3 Static Site
 
-variable "bucket_name" {
-  type        = string
-  description = "Nome do bucket vindo da Issue do GitHub"
-}
+on:
+  issues:
+    types: [opened]
 
-provider "aws" {
-  region = "us-west-2"
+jobs:
+  provision-s3:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-  # Bypasses para evitar chamadas de leitura bloqueadas pelo IAM da AWS Academy
-  skip_requesting_account_id  = true
-  skip_metadata_api_check     = true
-  skip_region_validation      = true
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-west-2
 
-  # Previne que o provider tente validar o estilo do endpoint via API
-  s3_use_path_style           = false
-}
+      - name: Extract Bucket Name from Issue
+        id: get_bucket
+        run: |
+          # Limpa o nome do bucket tirando espaços ou caracteres especiais
+          BUCKET=$(echo "${{ github.event.issue.title }}" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9-')
+          echo "BUCKET_NAME=static-site-$BUCKET" >> $GITHUB_ENV
 
-# 1. Bucket S3 com o bloco lifecycle/ignore_changes para ignorar o Object Lock
-resource "aws_s3_bucket" "static_site_bucket" {
-  bucket        = "static-site-${var.bucket_name}"
-  force_destroy = true
+      - name: Create S3 Bucket and Configure Website via AWS CLI
+        run: |
+          # 1. Cria o Bucket S3
+          aws s3api create-bucket \
+            --bucket ${{ env.BUCKET_NAME }} \
+            --region us-west-2 \
+            --create-bucket-configuration LocationConstraint=us-west-2 || true
 
-  lifecycle {
-    ignore_changes = [
-      object_lock_configuration,
-      object_lock_enabled
-    ]
-  }
+          # 2. Desativa o bloqueio de acesso público
+          aws s3api put-public-access-block \
+            --bucket ${{ env.BUCKET_NAME }} \
+            --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
 
-  tags = {
-    Name        = "Static Site Bucket"
-    Environment = "Production"
-  }
-}
+          # 3. Configura o S3 para Hospedagem de Site Estático
+          aws s3api put-bucket-website \
+            --bucket ${{ env.BUCKET_NAME }} \
+            --website-configuration '{"IndexDocument": {"Suffix": "index.html"}, "ErrorDocument": {"Key": "404.html"}}'
 
-# 2. Configuração do Site Estático
-resource "aws_s3_bucket_website_configuration" "static_site_config" {
-  bucket = aws_s3_bucket.static_site_bucket.id
-
-  index_document {
-    suffix = "index.html"
-  }
-
-  error_document {
-    key = "404.html"
-  }
-}
-
-# 3. Liberação de acesso público
-resource "aws_s3_bucket_public_access_block" "static_site_bucket" {
-  bucket = aws_s3_bucket.static_site_bucket.id
-
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
-}
-
-# 4. Saída da URL do site
-output "website_endpoint" {
-  value       = aws_s3_bucket_website_configuration.static_site_config.website_endpoint
-  description = "URL do site estático criado no S3"
-}
+      - name: Comment on Issue
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const bucketName = process.env.BUCKET_NAME;
+            const endpoint = `http://${bucketName}.s3-website-us-west-2.amazonaws.com`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `O Bucket do S3 foi criado com sucesso!\n\n**URL do Site Estático:** ${endpoint}`
+            })
