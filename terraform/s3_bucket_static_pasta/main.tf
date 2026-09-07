@@ -32,14 +32,25 @@ resource "null_resource" "static_site_bucket" {
   provisioner "local-exec" {
     command = <<-EOT
       set -e
+
       aws s3api create-bucket \
         --bucket ${local.full_bucket_name} \
         --region us-west-2 \
         --create-bucket-configuration LocationConstraint=us-west-2
 
+      # Libera o bloqueio de acesso público ANTES de tentar setar ACL pública
       aws s3api put-public-access-block \
         --bucket ${local.full_bucket_name} \
         --public-access-block-configuration BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false
+
+      # Precisa existir antes de aplicar ACL, senão dá erro de "ACLs not supported"
+      aws s3api put-bucket-ownership-controls \
+        --bucket ${local.full_bucket_name} \
+        --ownership-controls '{"Rules":[{"ObjectOwnership":"BucketOwnerPreferred"}]}'
+
+      aws s3api put-bucket-acl \
+        --bucket ${local.full_bucket_name} \
+        --acl public-read
 
       aws s3api put-bucket-website \
         --bucket ${local.full_bucket_name} \
