@@ -4,6 +4,10 @@ on:
   issues:
     types: [opened]
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   provision-s3:
     runs-on: ubuntu-latest
@@ -25,7 +29,6 @@ jobs:
       - name: Extract Bucket Name from Issue
         id: get_bucket
         run: |
-          # Formata o nome para minusculas e sem caracteres especiais
           CLEAN_NAME=$(echo "${{ github.event.issue.title }}" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9-')
           echo "BUCKET_NAME=$CLEAN_NAME" >> $GITHUB_ENV
 
