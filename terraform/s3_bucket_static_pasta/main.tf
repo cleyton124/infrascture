@@ -4,6 +4,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "3.75.1"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.2"
+    }
   }
 }
 
@@ -14,47 +18,37 @@ variable "bucket_name" {
 
 provider "aws" {
   region = "us-west-2"
-
-  skip_requesting_account_id = true
-  skip_metadata_api_check    = true
-  skip_region_validation     = true
 }
 
-# Cria o Bucket
-resource "aws_s3_bucket" "static_site_bucket" {
-  bucket        = "static-site-${var.bucket_name}"
-  force_destroy = true
-
-  tags = {
-    Name        = "Static Site Bucket"
-    Environment = "Production"
-  }
+locals {
+  full_bucket_name = "static-site-${var.bucket_name}"
 }
 
-# Configura o Site Estático
-resource "aws_s3_bucket_website_configuration" "static_site_config" {
-  bucket = aws_s3_bucket.static_site_bucket.id
-
-  index_document {
-    suffix = "index.html"
+resource "null_resource" "static_site_bucket" {
+  triggers = {
+    bucket_name = local.full_bucket_name
   }
 
-  error_document {
-    key = "404.html"
+  provisioner "local-exec" {
+    command = <<-EOT
+      set -e
+      aws s3api create-bucket \
+        --bucket ${local.full_bucket_name} \
+        --region us-west-2 \
+        --create-bucket-configuration LocationConstraint=us-west-2
+
+      aws s3api put-public-access-block \
+        --bucket ${local.full_bucket_name} \
+        --public-access-block-configuration BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false
+
+      aws s3api put-bucket-website \
+        --bucket ${local.full_bucket_name} \
+        --website-configuration '{"IndexDocument":{"Suffix":"index.html"},"ErrorDocument":{"Key":"404.html"}}'
+    EOT
   }
-}
-
-# Libera o Acesso Público
-resource "aws_s3_bucket_public_access_block" "static_site_bucket" {
-  bucket = aws_s3_bucket.static_site_bucket.id
-
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
 }
 
 output "website_endpoint" {
-  value       = aws_s3_bucket_website_configuration.static_site_config.website_endpoint
-  description = "URL do site estático"
+  value      = "${local.full_bucket_name}.s3-website-us-west-2.amazonaws.com"
+  depends_on = [null_resource.static_site_bucket]
 }
