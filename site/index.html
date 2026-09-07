@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeline de Infraestrutura - Site Estático S3</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-blue: #38bdf8;
+            --accent-purple: #a855f7;
+            --accent-green: #22c55e;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(to right, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        /* Pipeline Visual */
+        .pipeline-container {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 3rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        .pipeline-title {
+            font-size: 1.25rem;
+            color: var(--accent-blue);
+            margin-bottom: 1.5rem;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .pipeline-flow {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+        }
+
+        .step-card {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.2rem;
+            text-align: center;
+            flex: 1;
+            min-width: 150px;
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .step-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent-blue);
+        }
+
+        .step-icon {
+            width: 50px;
+            height: 50px;
+            object-fit: contain;
+            margin-bottom: 0.8rem;
+        }
+
+        .step-card h3 {
+            font-size: 1rem;
+            margin-bottom: 0.3rem;
+        }
+
+        .step-card p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .arrow {
+            color: var(--accent-blue);
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        /* Seção do Texto Explicativo */
+        .explanation-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .info-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1.5rem;
+        }
+
+        .info-card h2 {
+            color: var(--accent-green);
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .info-card p, .info-card ul {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .info-card ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        .info-card li {
+            margin-bottom: 0.8rem;
+            position: relative;
+            padding-left: 1.5rem;
+        }
+
+        .info-card li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--accent-blue);
+            font-weight: bold;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 4rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        /* Responsividade para celulares */
+        @media (max-width: 768px) {
+            .pipeline-flow {
+                flex-direction: column;
+            }
+            .arrow {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Infraestrutura como Código & Deployment Contínuo</h1>
+            <p>Hospedagem Estática Automatizada no AWS S3 via Terraform e GitHub Actions</p>
+        </header>
+
+        <!-- Seção Visual do Fluxo -->
+        <section class="pipeline-container">
+            <h2 class="pipeline-title">Fluxo de Execução da Infraestrutura</h2>
+            <div class="pipeline-flow">
+                
+                <div class="step-card">
+                    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" alt="GitHub" class="step-icon">
+                    <h3>1. GitHub</h3>
+                    <p>Trigger via Issue/Push</p>
+                </div>
+
+                <div class="arrow">&rarr;</div>
+
+                <div class="step-card">
+                    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/terraform/terraform-original.svg" alt="Terraform" class="step-icon">
+                    <h3>2. Terraform</h3>
+                    <p>Provisiona Infraestrutura</p>
+                </div>
+
+                <div class="arrow">&rarr;</div>
+
+                <div class="step-card">
+                    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/amazonwebservices/amazonwebservices-original-wordmark.svg" alt="AWS" class="step-icon">
+                    <h3>3. AWS Cloud</h3>
+                    <p>Autenticação IAM</p>
+                </div>
+
+                <div class="arrow">&rarr;</div>
+
+                <div class="step-card">
+                    <!-- Usando SVG simples representando o Bucket -->
+                    <svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2">
+                        <path d="M19 11 12 17 5 11" />
+                        <path d="M5 7 12 13 19 7 12 1 5 7" />
+                        <path d="M5 17 12 23 19 17" />
+                    </svg>
+                    <h3>4. Bucket S3</h3>
+                    <p>Armazenamento Seguro</p>
+                </div>
+
+                <div class="arrow">&rarr;</div>
+
+                <div class="step-card">
+                    <svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="2" y1="12" x2="22" y2="12" />
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                    </svg>
+                    <h3>5. Site Estático</h3>
+                    <p>Endpoint HTTP Público</p>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Explicação do Processo -->
+        <div class="explanation-grid">
+            <div class="info-card">
+                <h2>Como a Automação Funciona</h2>
+                <p>Este projeto utiliza o conceito de <strong>Infrastructure as Code (IaC)</strong>. Toda a arquitetura da nuvem foi escrita em arquivos de configuração declarativos e executada de forma automática.</p>
+            </div>
+
+            <div class="info-card">
+                <h2>Etapas do Processo</h2>
+                <ul>
+                    <li><strong>GitHub Actions:</strong> Atua como o orquestrador, capturando os eventos e disparando os comandos de implantação.</li>
+                    <li><strong>Terraform:</strong> Lê o estado desejado, conecta-se à API da AWS e cria o Bucket S3 com as políticas de acesso corretas.</li>
+                    <li><strong>AWS S3 Website:</strong> O bucket é configurado para servir arquivos estáticos (`index.html`), gerando uma URL pública acessível.</li>
+                </ul>
+            </div>
+        </div>
+
+        <footer>
+            <p>Projeto de Infraestrutura AWS Academy &bull; Desenvolvido com Terraform & GitHub Actions</p>
+        </footer>
+    </div>
+
+</body>
+</html>
