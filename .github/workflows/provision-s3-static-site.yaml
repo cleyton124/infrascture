@@ -38,10 +38,6 @@ jobs:
           terraform init
           terraform apply -auto-approve -var="bucket_name=${{ env.BUCKET_NAME }}"
 
-      - name: Upload site content
-        run: |
-          aws s3 sync ./site s3://static-site-${{ env.BUCKET_NAME }}/ --delete
-
       - name: Comment on Issue
         uses: actions/github-script@v6
         with:
