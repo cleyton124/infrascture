@@ -3,9 +3,22 @@
 ![Site funcionando](./images/Home.png)
 ![404](./images/404.png)
 
-Documentação técnica de um projeto de Infraestrutura como Código (IaC) que provisiona e publica um site estático no Amazon S3, disparado automaticamente pela abertura de uma *Issue* no GitHub.
+Documentação técnica de um projeto de Infraestrutura como Código (IaC) que provisionei para publicar um site estático no Amazon S3, disparado automaticamente pela abertura de uma *Issue* no GitHub.
 
-> ⚠️ **Contexto do ambiente:** Uma empresa precisa de uma infraestrutura como código para suas worksload que não precisa de configurar manualmente a infraestrutura pelo console da AWS. para isso precisa de uma IAC para seu site estático subir ou destruir de forma escalavel.
+> ⚠️ **Contexto do problema de negócio:** uma empresa precisa de infraestrutura como código para suas *workloads*, eliminando a configuração manual pelo console da AWS. Projetei essa automação para que o site estático possa subir ou ser destruído de forma **escalável** e **repetível**, sem intervenção humana no provisionamento.
+
+---
+
+## ☁️ Conceitos de nuvem aplicados neste projeto
+
+| Conceito | Onde apliquei no projeto |
+|---|---|
+| **IaaS** | Usei o Terraform para provisionar o recurso de infraestrutura (bucket S3) de forma declarativa |
+| **SaaS** | Usei o GitHub Actions que é uma ferramenta de CI/CD pronto, que só configurei via YAML, sem administrar nenhuma plataforma ou servidor por trás
+| **Elasticidade** | O bucket S3 escala o armazenamento automaticamente conforme a demanda, sem eu precisar provisionar disco |
+| **Escalabilidade** | O site aguenta picos de acesso sem qualquer alteração na infraestrutura que criei |
+| **Modelo de responsabilidade compartilhada** | A AWS garante a infraestrutura física e a disponibilidade do serviço S3; eu fiquei responsável pela configuração de acesso (IAM, bucket policy, permissões) |
+| **Menor privilégio** | Apliquei esse princípio tanto nas permissões de bucket (bloqueio público por padrão) quanto no `GITHUB_TOKEN` (leitura por padrão, escrita só quando declarada) |
 
 ---
 
@@ -18,28 +31,28 @@ Issue aberta no GitHub
 GitHub Actions dispara o workflow
         │
         ▼
-Configura credenciais AWS temporárias
+Configuro credenciais AWS temporárias
         │
         ▼
-Terraform + AWS CLI criam o bucket S3
+Terraform + AWS CLI provisionam o bucket S3
         │
         ▼
-Bucket é configurado (público, website, ACL)
+Configuro o bucket (público, website, ACL)
         │
         ▼
-Conteúdo do site é enviado (aws s3 sync)
+Envio o conteúdo do site (aws s3 sync)
         │
         ▼
-Comentário de confirmação na Issue
+Comento na Issue confirmando a conclusão
         │
         ▼
 Site estático publicado e acessível
 ```
 
-1. **Gatilho:** uma nova *Issue* é aberta no repositório.
-2. **Sanitização:** o nome da *Issue* é limpo e formatado para virar o nome do bucket.
-3. **Provisionamento (IaC):** Terraform cria e configura o bucket S3.
-4. **Deploy:** os arquivos estáticos (`index.html`, `404.html`) são sincronizados no bucket.
+1. **Disparo:** abro uma nova *Issue* no repositório.
+2. **Sanitização:** extraio e formato o título da *Issue* para virar o nome do bucket.
+3. **Provisionamento (IaC):** o Terraform cria e configura o bucket S3.
+4. **Deploy:** sincronizo os arquivos estáticos (`index.html`, `404.html`) no bucket.
 5. **Notificação:** o workflow comenta na *Issue* confirmando a conclusão.
 
 ---
@@ -79,13 +92,13 @@ Site estático publicado e acessível
 
 ## 🛠️ Fluxo de execução detalhado — erros e soluções
 
-Abaixo está o registro cronológico de tudo que aconteceu ao longo do desenvolvimento: cada erro real enfrentado, por que ele aconteceu, e como foi resolvido.
+Registrei cronologicamente cada erro real que enfrentei, por que ele aconteceu e como resolvi.
 
-### 1️⃣ Issue aberta dispara o workflow
+### 1️⃣ Disparo do workflow pela Issue
 
 ![Workflow disparado pela Issue](./images/workflows_github.png)
 
-Criei pelo *Issue* a automação ou  CI/CD. O GitHub Actions está configurado para escutar esse evento:
+Configurei a automação de CI/CD para escutar o evento de abertura de Issue:
 
 ```yaml
 on:
@@ -93,7 +106,7 @@ on:
     types: [opened]
 ```
 
-O título da *Issue* é extraído e limpo (minúsculas, sem acentos/caracteres especiais) para virar o nome do bucket:
+Extraí e limpei o título da *Issue* (minúsculas, sem acentos/caracteres especiais) para usá-lo como nome do bucket:
 
 ```yaml
 - name: Extract Bucket Name from Issue
@@ -103,6 +116,7 @@ O título da *Issue* é extraído e limpo (minúsculas, sem acentos/caracteres e
     echo "BUCKET_NAME=$CLEAN_NAME" >> $GITHUB_ENV
 ```
 
+> 💡 **Aprendizado:** entendi que o GitHub Actions me entrega CI/CD orientado a eventos pronto pra usar.
 ---
 
 ### 2️⃣ Falha de autenticação com a AWS
@@ -110,8 +124,11 @@ O título da *Issue* é extraído e limpo (minúsculas, sem acentos/caracteres e
 ![Erro de autenticação AWS](./images/erro_autenticação.png)
 
 * **Erro:** token de sessão expirado (`ExpiredToken` / `The security token included in the request is invalid`).
-* **Causa raiz:** minha contas do laboratório usa credenciais **temporárias**, com validade curta.Logo a sessão expirou no Github actions. 
-* **Solução:** Precisei buscar credenciais novas e atualizar no Github.
+* **Causa raiz:** identifiquei que a conta do laboratório usa credenciais **temporárias**, com validade curta, e a sessão expirou durante a execução no GitHub Actions.
+* **Solução:** busquei credenciais novas e atualizei os *Secrets* no GitHub.
+
+> 💡 **Aprendizado:** compreendi que credenciais temporárias (via STS) são uma aplicação prática do **menor privilégio** combinada a limite de tempo e reduzem a janela de exposição caso vazem, mas exigem gerenciamento ativo do ciclo de vida das credenciais.
+
 ---
 
 ### 3️⃣ Bloqueio de permissão no Terraform (Object Lock)
@@ -124,8 +141,8 @@ O título da *Issue* é extraído e limpo (minúsculas, sem acentos/caracteres e
   ... is not authorized to perform: s3:GetBucketObjectLockConfiguration
   with an explicit deny in an identity-based policy: arn:aws:iam::...:policy/Pvoclabs2
   ```
-* **Causa raiz:** o recurso nativo `aws_s3_bucket` do provider Terraform faz, automaticamente, uma leitura completa do bucket logo após criá-lo,incluindo a configuração de Object Lock,então a política `Pvoclabs2` do laboratório tem um **explicit deny** nessa chamada específica,bloqueando essa leitura.
-* **Solução:** substitui o recurso declarativo `aws_s3_bucket` por um `null_resource` orquestrando a criação via **AWS CLI**, evitando a chamada automática que o provider faz:
+* **Causa raiz:** investiguei e descobri que o recurso nativo `aws_s3_bucket` do provider Terraform executa automaticamente uma leitura completa do bucket logo após criá-lo, incluindo a configuração de Object Lock. A política `Pvoclabs2` do laboratório aplica um **explicit deny** nessa chamada específica, bloqueando a leitura.
+* **Solução:** substituí o recurso declarativo `aws_s3_bucket` por um `null_resource`, orquestrando a criação de forma imperativa via **AWS CLI**, contornando a chamada automática do provider:
 
 ```hcl
 resource "null_resource" "static_site_bucket" {
@@ -160,37 +177,18 @@ resource "null_resource" "static_site_bucket" {
   }
 }
 ```
-OBS: passei muitas horas tentando enterder esse problema e foi o que mais causou problema.
 
-**Lição aprendida:** quando um recurso nativo do Terraform faz chamadas "escondidas" que sua conta não tem permissão de executar, a solução não é insistir com o recurso declarativo, é orquestrar aquela etapa via CLI imperativo dentro de um `null_resource`.
+OBS: passei muitas horas investigando esse problema e foi o que mais me custou tempo no projeto.
+
+> 💡 **Aprendizado:** esse erro me fez enxergar na prática o **modelo de responsabilidade compartilhada**: a AWS garante a infraestrutura e a disponibilidade do serviço S3, mas a segurança de acesso (as políticas IAM aplicadas à minha conta) é responsabilidade de quem administra a conta e, mesmo sem poder alterá-la, precisei adaptar minha arquitetura para respeitá-la. Também aprendi que, quando um recurso declarativo faz chamadas "escondidas" que minha conta não pode executar, a solução é orquestrar aquela etapa de forma imperativa via CLI.
 
 ---
 
-### 9️ `GITHUB_TOKEN` sem permissão de escrita
-
-![Erro de permissão ao comentar na Issue](./images/Error%20Unhandled%20error%20HttpError%20Resource%20not%20accessible%20by%20integration.png)
-
-* **Erro:**
-  ```
-  RequestError [HttpError]: Resource not accessible by integration
-  status: 403
-  'x-accepted-github-permissions': 'issues=write; pull_requests=write'
-  ```
-* **Causa raiz:** por padrão, o `GITHUB_TOKEN` automático do GitHub Actions vem apenas com permissão de **leitura**. O último *step* do workflow precisa comentar na Issue, o que exige escrita.
-* **Solução:** declarei explicitamente as permissões necessárias no início do arquivo de workflow:
-
-```yaml
-permissions:
-  contents: read
-  issues: write
-```
-
-
-### 4️⃣ Bucket criado com sucesso
+### 4️⃣ Bucket provisionado com sucesso
 
 ![Bucket listado na conta AWS](./images/buckets_da_conta.png)
 
-Com o `null_resource` no lugar do `aws_s3_bucket`, o `terraform apply` passou a rodar sem bater na permissão bloqueada,logo os buckets aparecem corretamente listado na conta.
+Com o `null_resource` no lugar do `aws_s3_bucket`, executei o `terraform apply` sem bater na permissão bloqueada, e o bucket passou a aparecer corretamente listado na conta.
 
 ---
 
@@ -200,8 +198,10 @@ Com o `null_resource` no lugar do `aws_s3_bucket`, o `terraform apply` passou a 
 ![Erro 403 Forbidden ao acessar o site](./images/erro_403_Forbidden.png)
 
 * **Erro:** `403 Forbidden` ao tentar acessar o endpoint do site.
-* **Causa raiz:** por padrão, o S3 bloqueia toda leitura pública de objetos para manter o principio de menor privilegio,mesmo com o *website hosting* habilitado.Então liberei o *Public Access Block* e criei uma *Bucket Policy* de leitura pública.
-* **Solução:** os comandos `put-public-access-block` e `put-bucket-acl` (já incluídos no `null_resource` da etapa 3) resolveram isso automaticamente a cada `apply`.
+* **Causa raiz:** identifiquei que, por padrão, o S3 bloqueia toda leitura pública de objetos para manter o **princípio de menor privilégio**, mesmo com o *website hosting* habilitado.
+* **Solução:** liberei o *Public Access Block* e apliquei uma *Bucket Policy* de leitura pública através dos comandos `put-public-access-block` e `put-bucket-acl` (já incluídos no `null_resource` da etapa 3).
+
+> 💡 **Aprendizado:** aprendi que serviços gerenciados como o S3 vêm com postura de segurança restritiva por padrão ("*secure by default*") e que abrir acesso público é uma decisão explícita que eu, como responsável pela camada de configuração, preciso tomar conscientemente.
 
 ---
 
@@ -209,7 +209,8 @@ Com o `null_resource` no lugar do `aws_s3_bucket`, o `terraform apply` passou a 
 
 ![Política do bucket aplicada](./images/politica_bucket.png)
 
-Depois de corrigir, o bucket passa a aceitar leitura pública dos objetos com permissão de leitura mantendo o principio de menor privilégio.
+Após corrigir a configuração, o bucket passou a aceitar leitura pública dos objetos, mantendo apenas a permissão mínima necessária sem abrir escrita ou exclusão para o público.
+
 ---
 
 ### 7️⃣ Bucket vazio → 404 NoSuchKey
@@ -224,8 +225,10 @@ Depois de corrigir, o bucket passa a aceitar leitura pública dos objetos com pe
   Code: NoSuchKey
   Key: index.html
   ```
-* **Causa raiz:** O S3 não tinha nenhum arquivo `index.html`/`404.html` dentro dele ainda.Provisionei pelo Terraform a infraestrutura mas não coloquei automaticamente para provisionar os arquivos no codigo.
-* **Solução:** criação dos arquivos estáticos (`site/index.html`, `site/404.html`) e upload para o bucket.
+* **Causa raiz:** o bucket não tinha nenhum arquivo `index.html`/`404.html`. Eu havia provisionado a infraestrutura pelo Terraform, mas não tinha automatizado o envio dos arquivos no pipeline.
+* **Solução:** criei os arquivos estáticos (`site/index.html`, `site/404.html`) e fiz o upload para o bucket.
+
+> 💡 **Aprendizado:** entendi na prática a separação entre **provisionamento de infraestrutura** (IaC) e **deploy de conteúdo/aplicação**. são duas etapas distintas de uma esteira de entrega contínua, e uma não substitui a outra.
 
 ---
 
@@ -234,27 +237,55 @@ Depois de corrigir, o bucket passa a aceitar leitura pública dos objetos com pe
 ![Upload de index.html e 404.html](./images/upload_index.html_404.html.png)
 ![Objetos dentro do bucket](./images/objetos_do_bucket.png)
 
-Realizei o upload manual inicial via CLI, para validar:
+Realizei o upload manual inicial via CLI para validar:
 
 ```bash
-aws s3 cp site/index.html s3://NOME-DO-BUCKET/
-aws s3 cp site/404.html s3://NOME-DO-BUCKET/
+aws s3 cp site/index.html s3://static-site-my-static-site/
+aws s3 cp site/404.html s3://static-site-my-static-site/
 ```
 
-Depois corrigi, automatizando dentro do workflow com `aws s3 sync`, garantindo que toda vez que uma nova Issue disparar o pipeline, o conteúdo mais recente da pasta `site/` seja publicado:
+Depois automatizei essa etapa dentro do workflow com `aws s3 sync`, garantindo que toda nova Issue publique automaticamente o conteúdo mais recente da pasta `site/`:
 
 ```yaml
 - name: Upload Site Content
   run: |
     aws s3 sync ./site s3://static-site-${{ env.BUCKET_NAME }}/ --delete
 ```
+
+> 💡 **Aprendizado:** percebi que automatizar o `s3 sync` no pipeline transforma um deploy manual e repetitivo em **entrega contínua** cada Issue passa a gerar, de forma consistente, o mesmo resultado.
+
+---
+
+### 9️⃣ `GITHUB_TOKEN` sem permissão de escrita
+
+![Erro de permissão ao comentar na Issue](./images/Error%20Unhandled%20error%20HttpError%20Resource%20not%20accessible%20by%20integration.png)
+
+* **Erro:**
+  ```
+  RequestError [HttpError]: Resource not accessible by integration
+  status: 403
+  'x-accepted-github-permissions': 'issues=write; pull_requests=write'
+  ```
+* **Causa raiz:** identifiquei que o `GITHUB_TOKEN` automático do GitHub Actions vem, por padrão, apenas com permissão de **leitura**. O último *step* do workflow precisa comentar na Issue, o que exige escrita.
+* **Solução:** declarei explicitamente as permissões necessárias no início do arquivo de workflow:
+
+```yaml
+permissions:
+  contents: read
+  issues: write
+```
+
+> 💡 **Aprendizado:** confirmei que **menor privilégio** não se aplica só a contas na nuvem, tokens de automação/CI seguem a mesma lógica, e escalar permissão só deve acontecer quando explicitamente necessário.
+
 ---
 
 ### 🔟 Site publicado com sucesso
 
 ![Site estático funcionando](./images/Home.png)
 
-Com todos os ajustes aplicados, o pipeline completo passa a funcionar de ponta a ponta: da Issue aberta até o site acessível publicamente pelo endpoint do S3.
+Com todos os ajustes aplicados, consegui rodar o pipeline completo de ponta a ponta: da Issue aberta até o site acessível publicamente pelo endpoint do S3.
+
+> 💡 **Aprendizado:** validei que, mesmo sem provisionar nenhum servidor web, o site suporta picos de tráfego sem qualquer intervenção minha,uma demonstração direta de **elasticidade** e **escalabilidade** de um serviço gerenciado. Isso me mostrou o valor real da IaC: da Issue aberta até o site no ar, todo o processo foi repetível, consistente e sem toque manual no console da AWS.
 
 ---
 
